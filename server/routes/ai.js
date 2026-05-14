@@ -4,6 +4,7 @@ const pool = require('../db');
 const router = express.Router();
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const MODEL = process.env.OPENROUTER_MODEL || 'anthropic/claude-3-5-sonnet-20241022';
 
 async function callAI(prompt, systemPrompt) {
   const response = await fetch(OPENROUTER_URL, {
@@ -15,7 +16,7 @@ async function callAI(prompt, systemPrompt) {
       'X-Title': 'AI Mortgage Underwriting Assistant',
     },
     body: JSON.stringify({
-      model: process.env.OPENROUTER_MODEL || 'anthropic/claude-haiku-4.5',
+      model: MODEL,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: prompt }
@@ -27,6 +28,19 @@ async function callAI(prompt, systemPrompt) {
   const data = await response.json();
   if (data.error) throw new Error(data.error.message || 'AI API error');
   return data.choices[0].message.content;
+}
+
+// Helper: parse JSON from AI response, extract first JSON object
+function parseAIJson(content) {
+  try {
+    return JSON.parse(content);
+  } catch {
+    const match = content.match(/\{[\s\S]*\}/);
+    if (match) {
+      try { return JSON.parse(match[0]); } catch {}
+    }
+    return null;
+  }
 }
 
 // 1. AI Credit Risk Assessment
@@ -47,17 +61,19 @@ router.post('/credit-risk', async (req, res) => {
 - Employment: ${b.employment_status} at ${b.employer_name}, ${b.years_employed} years
 - Credit Reports: ${cr.map(c => `${c.bureau}: Score ${c.score}, ${c.delinquencies} delinquencies, ${c.bankruptcies} bankruptcies, ${c.collections} collections, ${c.total_balance} total balance`).join('; ')}
 
-Provide: 1) Risk Level (Low/Medium/High), 2) Risk Score (0-100), 3) Key Risk Factors, 4) Mitigating Factors, 5) Recommendation. Format as structured analysis.`;
+Return JSON: { "risk_score": <300-850>, "risk_category": "excellent|good|fair|poor", "risk_factors": ["<factor>"], "mitigating_factors": ["<factor>"], "approve_recommendation": <true|false>, "conditions_if_approved": ["<condition>"], "summary": "<brief narrative>" }`;
 
-    const systemPrompt = 'You are an expert mortgage underwriting AI. Provide detailed, professional credit risk assessments. Always structure your response with clear sections and actionable insights.';
-    const result = await callAI(prompt, systemPrompt);
+    const systemPrompt = 'You are an expert mortgage underwriting AI. Provide detailed, professional credit risk assessments. Return ONLY valid JSON — no markdown, no extra text.';
+    const rawResult = await callAI(prompt, systemPrompt);
+    const structured = parseAIJson(rawResult);
+    const result = structured || rawResult;
 
     await pool.query(
       `INSERT INTO ai_analyses (borrower_id, analysis_type, input_data, result, model_used, status) VALUES ($1, 'credit_risk', $2::jsonb, $3::jsonb, $4, 'completed')`,
-      [borrower_id, JSON.stringify({ borrower: b, credit_reports: cr }), JSON.stringify({ analysis: result }), process.env.OPENROUTER_MODEL]
+      [borrower_id, JSON.stringify({ borrower: b, credit_reports: cr }), JSON.stringify({ analysis: result }), MODEL]
     );
 
-    res.json({ analysis: result, borrower: b, credit_reports: cr });
+    res.json({ analysis: result, structured: !!structured, borrower: b, credit_reports: cr });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -139,11 +155,13 @@ router.post('/fraud-detection', async (req, res) => {
 - Purpose: ${a.purpose}
 - Documents: ${docs.rows.map(d => `${d.name} (${d.status})`).join(', ')}
 
-Check for: 1) Income Misrepresentation, 2) Identity Red Flags, 3) Property Value Inflation, 4) Occupancy Fraud Indicators, 5) Straw Buyer Indicators, 6) Document Inconsistencies, 7) Overall Fraud Risk Score (0-100), 8) Recommended Actions.`;
+Return JSON: { "fraud_risk": "low|medium|high|critical", "fraud_score": <0-100>, "red_flags": ["<flag>"], "verification_required": ["<item>"], "recommendation": "<action>", "reasoning": "<brief explanation>" }`;
 
-    const systemPrompt = 'You are a mortgage fraud detection AI specialist. Analyze applications for common mortgage fraud patterns including income fraud, appraisal fraud, identity fraud, and occupancy fraud. Be thorough but fair.';
-    const result = await callAI(prompt, systemPrompt);
-    res.json({ analysis: result, application: a });
+    const systemPrompt = 'You are a mortgage fraud detection AI specialist. Analyze applications for common mortgage fraud patterns. Return ONLY valid JSON — no markdown, no extra text.';
+    const rawResult = await callAI(prompt, systemPrompt);
+    const structured = parseAIJson(rawResult);
+    const result = structured || rawResult;
+    res.json({ analysis: result, structured: !!structured, application: a });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -292,17 +310,19 @@ router.post('/underwriting-decision', async (req, res) => {
 - Conditions: ${conditions.rows.length} total (${conditions.rows.filter(c => c.status === 'pending').length} pending)
 - Compliance: ${compliance.rows.map(c => `${c.check_type}: ${c.result || c.status}`).join(', ')}
 
-Provide: 1) Decision (Approve/Approve with Conditions/Suspend/Deny), 2) Confidence Level, 3) Key Decision Factors, 4) Required Conditions, 5) Risk Summary, 6) Detailed Rationale, 7) Stipulations if Approved.`;
+Return JSON: { "decision": "approve|deny|suspend", "confidence": <0-100>, "rationale": "<explanation>", "conditions": ["<condition>"], "denial_reasons": ["<reason>"], "stipulations": ["<item>"], "risk_summary": "<summary>" }`;
 
-    const systemPrompt = 'You are an automated mortgage underwriting decision engine. Make fair, compliant, and well-reasoned underwriting decisions based on all available data. Follow DU/LP decision guidelines.';
-    const result = await callAI(prompt, systemPrompt);
+    const systemPrompt = 'You are an automated mortgage underwriting decision engine. Follow DU/LP decision guidelines. Return ONLY valid JSON — no markdown, no extra text.';
+    const rawResult = await callAI(prompt, systemPrompt);
+    const structured = parseAIJson(rawResult);
+    const result = structured || rawResult;
 
     await pool.query(
       `INSERT INTO ai_analyses (application_id, analysis_type, result, model_used, status) VALUES ($1, 'underwriting_decision', $2::jsonb, $3, 'completed')`,
-      [application_id, JSON.stringify({ decision: result }), process.env.OPENROUTER_MODEL]
+      [application_id, JSON.stringify({ decision: result }), MODEL]
     );
 
-    res.json({ analysis: result, application: a });
+    res.json({ analysis: result, structured: !!structured, application: a });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -714,6 +734,164 @@ Analyze: 1) Geographic Concentration Risk, 2) Product Mix Risk, 3) Credit Qualit
 
     const result = await callAI(prompt, 'You are a mortgage portfolio risk management AI. Analyze aggregate portfolio risk, concentration exposure, and provide strategic recommendations.');
     res.json({ analysis: result });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ============================================================
+// Apply pass 4 (mechanical backlog)
+// 503 when OPENROUTER_API_KEY is unset.
+// ============================================================
+const requireKey = (res) => {
+  if (!process.env.OPENROUTER_API_KEY) {
+    res.status(503).json({ error: 'AI service not configured', message: 'OPENROUTER_API_KEY is not set' });
+    return false;
+  }
+  return true;
+};
+
+// 26. AI Title Risk Assessment
+router.post('/title-risk-assessment', async (req, res) => {
+  try {
+    if (!requireKey(res)) return;
+    const { property_id, application_id, title_notes } = req.body || {};
+    let property = null, application = null;
+    if (property_id) {
+      const r = await pool.query('SELECT * FROM properties WHERE id = $1', [property_id]);
+      property = r.rows[0] || null;
+    }
+    if (application_id) {
+      const r = await pool.query('SELECT * FROM loan_applications WHERE id = $1', [application_id]);
+      application = r.rows[0] || null;
+    }
+    if (!property && !title_notes) {
+      return res.status(400).json({ error: 'property_id or title_notes is required' });
+    }
+
+    const prompt = `Assess title risk for this mortgage transaction:
+- Property: ${property ? `${property.address}, ${property.city}, ${property.state} ${property.zip}; type ${property.property_type}; built ${property.year_built}; est value $${property.estimated_value}` : 'N/A'}
+- Application: ${application ? `${application.application_number}; loan $${application.loan_amount}; LTV ${application.ltv_ratio}%` : 'N/A'}
+- Title notes / preliminary report excerpt: ${title_notes || 'none provided'}
+
+Return JSON: { "risk_level": "low|medium|high", "title_issues": ["..."], "liens_or_encumbrances": ["..."], "required_endorsements": ["..."], "title_insurance_recommendation": "...", "clear_to_close_obstacles": ["..."], "summary": "..." }`;
+
+    const systemPrompt = 'You are a title risk assessment specialist for mortgage underwriting. Identify liens, encumbrances, chain-of-title concerns, and required endorsements. Return ONLY valid JSON.';
+    const rawResult = await callAI(prompt, systemPrompt);
+    const structured = parseAIJson(rawResult);
+    res.json({ analysis: structured || rawResult, structured: !!structured, property, application });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 27. AI Closing Readiness
+router.post('/closing-readiness', async (req, res) => {
+  try {
+    if (!requireKey(res)) return;
+    const { application_id } = req.body || {};
+    if (!application_id) return res.status(400).json({ error: 'application_id is required' });
+
+    const app = await pool.query('SELECT * FROM loan_applications WHERE id = $1', [application_id]);
+    if (app.rows.length === 0) return res.status(404).json({ error: 'Application not found' });
+    const a = app.rows[0];
+
+    let conditions = { rows: [] };
+    let documents = { rows: [] };
+    try { conditions = await pool.query('SELECT * FROM conditions WHERE application_id = $1', [application_id]); } catch {}
+    try { documents = await pool.query('SELECT * FROM documents WHERE application_id = $1', [application_id]); } catch {}
+
+    const openConditions = conditions.rows.filter(c => c.status && c.status !== 'cleared' && c.status !== 'satisfied');
+
+    const prompt = `Assess closing readiness for this mortgage application:
+- Application: ${a.application_number}; status ${a.status}; loan $${a.loan_amount}; LTV ${a.ltv_ratio}%; DTI ${a.dti_ratio}%
+- Total conditions: ${conditions.rows.length}; open: ${openConditions.length}
+- Open condition list: ${openConditions.slice(0,15).map(c => `[${c.status}] ${c.description || c.condition_text || c.type}`).join('; ') || 'none'}
+- Document count: ${documents.rows.length}
+
+Return JSON: { "ready_to_close": true|false, "readiness_score": 0-100, "outstanding_items": ["..."], "blocking_items": ["..."], "recommended_next_steps": ["..."], "estimated_days_to_close": 0, "summary": "..." }`;
+
+    const systemPrompt = 'You are a closing coordination AI. Assess whether a mortgage is ready to close, list outstanding conditions and blockers, and recommend next steps. Return ONLY valid JSON.';
+    const rawResult = await callAI(prompt, systemPrompt);
+    const structured = parseAIJson(rawResult);
+    res.json({ analysis: structured || rawResult, structured: !!structured, application: a, open_conditions: openConditions.length });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ============================================================
+// Apply pass 5 — remaining backlog
+// ============================================================
+
+// PRODUCT-DECISION: /asset-verification overlaps with /document-analysis but
+// the audit explicitly listed it as a missing feature. Default chosen here:
+// expose a dedicated endpoint that focuses ONLY on bank-statement / brokerage /
+// retirement-asset confirmation — it does NOT replace document-analysis. Output
+// shape is dedicated to liquid-asset evaluation (sufficiency for down payment,
+// reserves, sourcing of funds, large-deposit explanations).
+// 28. AI Asset Verification
+router.post('/asset-verification', async (req, res) => {
+  try {
+    if (!requireKey(res)) return;
+    const { borrower_id, application_id, assets, statements_summary } = req.body || {};
+    let borrower = null, application = null;
+    if (borrower_id) {
+      const r = await pool.query('SELECT * FROM borrowers WHERE id = $1', [borrower_id]);
+      borrower = r.rows[0] || null;
+    }
+    if (application_id) {
+      const r = await pool.query('SELECT * FROM loan_applications WHERE id = $1', [application_id]);
+      application = r.rows[0] || null;
+    }
+    if (!borrower && !assets && !statements_summary) {
+      return res.status(400).json({ error: 'borrower_id, assets[], or statements_summary is required' });
+    }
+
+    const prompt = `Verify borrower's liquid assets for mortgage qualification:
+- Borrower: ${borrower ? `${borrower.first_name} ${borrower.last_name}; income $${borrower.annual_income}` : 'N/A'}
+- Application: ${application ? `loan $${application.loan_amount}; LTV ${application.ltv_ratio}%; down-payment requirement implied` : 'N/A'}
+- Declared assets: ${Array.isArray(assets) ? JSON.stringify(assets) : 'none provided'}
+- Statements summary: ${statements_summary || 'none'}
+
+Return JSON: { "verified_total_usd": 0, "sufficient_for_down_payment": true|false, "reserves_months": 0, "large_deposits_to_source": ["..."], "asset_breakdown": {"checking":0,"savings":0,"brokerage":0,"retirement":0,"other":0}, "verification_concerns": ["..."], "recommended_documentation": ["..."], "summary": "..." }`;
+
+    const systemPrompt = 'You are an asset-verification underwriter. Confirm sufficiency of borrower liquid assets for down payment + reserves, flag large/unsourced deposits, and recommend documentation. Return ONLY valid JSON.';
+    const rawResult = await callAI(prompt, systemPrompt);
+    const structured = parseAIJson(rawResult);
+    res.json({ analysis: structured || rawResult, structured: !!structured, borrower, application });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PRODUCT-DECISION: /employment-verification overlaps with /income-verification
+// but the audit explicitly listed it as a missing feature. Default chosen
+// here: produce an EMPLOYMENT-only verification (employer confirmation,
+// VOE-style fields, length-of-employment risk, gaps, 4506-T need) and let
+// /income-verification keep ownership of pay-stub / W-2 income calculation.
+// 29. AI Employment Verification
+router.post('/employment-verification', async (req, res) => {
+  try {
+    if (!requireKey(res)) return;
+    const { borrower_id, application_id, voe_text, employer_phone } = req.body || {};
+    let borrower = null, application = null;
+    if (borrower_id) {
+      const r = await pool.query('SELECT * FROM borrowers WHERE id = $1', [borrower_id]);
+      borrower = r.rows[0] || null;
+    }
+    if (application_id) {
+      const r = await pool.query('SELECT * FROM loan_applications WHERE id = $1', [application_id]);
+      application = r.rows[0] || null;
+    }
+    if (!borrower && !voe_text) {
+      return res.status(400).json({ error: 'borrower_id or voe_text is required' });
+    }
+
+    const prompt = `Perform employment verification analysis (VOE) for a mortgage borrower:
+- Borrower: ${borrower ? `${borrower.first_name} ${borrower.last_name}; employer ${borrower.employer_name}; ${borrower.years_employed} years; status ${borrower.employment_status}` : 'N/A'}
+- Application: ${application ? `${application.application_number}; loan $${application.loan_amount}` : 'N/A'}
+- VOE / verification text: ${voe_text || 'none provided'}
+- Employer phone: ${employer_phone || 'none'}
+
+Return JSON: { "employment_verified": true|false, "tenure_years": 0, "tenure_risk": "low|medium|high", "employment_gaps": ["..."], "voe_concerns": ["..."], "needs_4506t": true|false, "needs_written_voe": true|false, "needs_verbal_voe": true|false, "summary": "..." }`;
+
+    const systemPrompt = 'You are an employment-verification underwriter. Focus ONLY on employment status, tenure, gaps, and VOE documentation needs (NOT income calculation — that is the income-verification endpoint\'s job). Return ONLY valid JSON.';
+    const rawResult = await callAI(prompt, systemPrompt);
+    const structured = parseAIJson(rawResult);
+    res.json({ analysis: structured || rawResult, structured: !!structured, borrower, application });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

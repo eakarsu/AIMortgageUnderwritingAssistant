@@ -22,7 +22,7 @@ export default function UnderwritingRules() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <div><h1 className="text-2xl font-bold">Underwriting Rules</h1><p className="text-gray-500 text-sm">{items.length} rules</p></div>
+        <div><h1 className="text-2xl font-bold">Underwriting Rules</h1><p className="text-gray-500 text-sm">{items.length} rules — evaluate on the Application Detail page</p></div>
         <button onClick={openNew} className="btn-primary">+ New Rule</button>
       </div>
       <div className="bg-white rounded-xl shadow-sm border overflow-hidden">

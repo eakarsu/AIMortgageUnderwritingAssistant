@@ -5,12 +5,23 @@ import { StatusBadge, Modal, FormField } from '../components/DataPage';
 
 export default function Borrowers() {
   const [items, setItems] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [form, setForm] = useState({});
   const navigate = useNavigate();
 
-  const load = () => api.get('/borrowers').then(r => setItems(r.data));
+  const load = (p = 1) => {
+    api.get(`/borrowers?page=${p}&limit=25`).then(r => {
+      const d = r.data;
+      setItems(d.data || d);
+      setTotal(d.total || (d.data || d).length);
+      setTotalPages(d.totalPages || 1);
+      setPage(p);
+    });
+  };
   useEffect(() => { load(); }, []);
 
   const openNew = () => { setEditItem(null); setForm({ employment_status: 'employed' }); setShowModal(true); };
@@ -19,15 +30,15 @@ export default function Borrowers() {
   const save = async () => {
     if (editItem) await api.put(`/borrowers/${editItem.id}`, form);
     else await api.post('/borrowers', form);
-    setShowModal(false); load();
+    setShowModal(false); load(page);
   };
 
-  const remove = async (id, e) => { e.stopPropagation(); if (confirm('Delete?')) { await api.delete(`/borrowers/${id}`); load(); } };
+  const remove = async (id, e) => { e.stopPropagation(); if (confirm('Delete?')) { await api.delete(`/borrowers/${id}`); load(page); } };
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <div><h1 className="text-2xl font-bold">Borrowers</h1><p className="text-gray-500 text-sm">{items.length} borrowers</p></div>
+        <div><h1 className="text-2xl font-bold">Borrowers</h1><p className="text-gray-500 text-sm">{total} borrowers</p></div>
         <button onClick={openNew} className="btn-primary">+ New Borrower</button>
       </div>
       <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
@@ -60,10 +71,20 @@ export default function Borrowers() {
             ))}
           </tbody>
         </table>
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50">
+            <span className="text-sm text-gray-500">Page {page} of {totalPages} &mdash; {total} total</span>
+            <div className="flex gap-2">
+              <button onClick={() => load(page - 1)} disabled={page <= 1} className="px-3 py-1 rounded border text-sm disabled:opacity-40 hover:bg-white">Prev</button>
+              <button onClick={() => load(page + 1)} disabled={page >= totalPages} className="px-3 py-1 rounded border text-sm disabled:opacity-40 hover:bg-white">Next</button>
+            </div>
+          </div>
+        )}
       </div>
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editItem ? 'Edit Borrower' : 'New Borrower'}>
         <div className="grid grid-cols-2 gap-4">
-          {[['first_name','First Name'],['last_name','Last Name'],['email','Email'],['phone','Phone'],['employer_name','Employer'],['job_title','Job Title'],['annual_income','Annual Income'],['monthly_debt','Monthly Debt'],['credit_score','Credit Score'],['years_employed','Years Employed'],['address','Address'],['city','City'],['state','State'],['zip','Zip']].map(([k,l]) => (
+          {[['first_name','First Name'],['last_name','Last Name'],['email','Email'],['phone','Phone'],['ssn_last4','SSN Last 4'],['employer_name','Employer'],['job_title','Job Title'],['annual_income','Annual Income'],['monthly_debt','Monthly Debt'],['credit_score','Credit Score'],['years_employed','Years Employed'],['address','Address'],['city','City'],['state','State'],['zip','Zip']].map(([k,l]) => (
             <FormField key={k} label={l}><input className="input-field" value={form[k]||''} onChange={e => setForm({...form,[k]:e.target.value})} /></FormField>
           ))}
           <FormField label="Employment Status">

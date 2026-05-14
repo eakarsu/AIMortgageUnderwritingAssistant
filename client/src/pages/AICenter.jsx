@@ -29,6 +29,8 @@ const aiTools = [
   { id: 'audit-anomaly', name: 'Audit Anomaly Detection', icon: '🔐', desc: 'Detect suspicious patterns in system audit logs', category: 'Operations & Intelligence', color: 'from-red-600 to-red-800' },
   { id: 'notification-intelligence', name: 'Smart Notifications', icon: '🔔', desc: 'AI-prioritized alerts and team notifications', category: 'Operations & Intelligence', color: 'from-amber-500 to-orange-600' },
   { id: 'portfolio-risk', name: 'Portfolio Risk Analysis', icon: '📊', desc: 'Aggregate portfolio risk, concentration, and stress testing', category: 'Operations & Intelligence', color: 'from-slate-500 to-slate-700' },
+  { id: 'title-risk-assessment', name: 'Title Risk Assessment', icon: '📜', desc: 'Title risk, liens, encumbrances, and required endorsements', category: 'Application Review', color: 'from-stone-500 to-stone-700' },
+  { id: 'closing-readiness', name: 'Closing Readiness', icon: '🔑', desc: 'Are all conditions cleared? Ready-to-close score and blockers', category: 'Application Review', color: 'from-green-600 to-emerald-700' },
 ];
 
 const categories = ['Borrower Analysis', 'Property & Valuation', 'Application Review', 'Operations & Intelligence'];
@@ -167,6 +169,16 @@ const samplePresets = {
   'portfolio-risk': [
     { label: 'Full Portfolio Analysis', data: {} },
   ],
+  'title-risk-assessment': [
+    { label: '123 Sunset Blvd, LA', data: { property_id: 1, application_id: 1 } },
+    { label: '654 Park Ave, NYC', data: { property_id: 5, application_id: 5 } },
+    { label: 'Bayfront Miami (Flood)', data: { property_id: 7, application_id: 7 } },
+  ],
+  'closing-readiness': [
+    { label: 'APP-2024-001', data: { application_id: 1 } },
+    { label: 'APP-2024-006 - Conditional', data: { application_id: 6 } },
+    { label: 'APP-2024-015 - High Priority', data: { application_id: 15 } },
+  ],
 };
 
 export default function AICenter() {
@@ -223,7 +235,7 @@ export default function AICenter() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">AI Analysis Center</h1>
-            <p className="text-gray-500 text-sm">25 AI-powered mortgage underwriting tools</p>
+            <p className="text-gray-500 text-sm">{aiTools.length} AI-powered mortgage underwriting tools</p>
           </div>
         </div>
       </div>

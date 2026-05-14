@@ -5,6 +5,9 @@ import { StatusBadge, Modal, FormField } from '../components/DataPage';
 
 export default function Applications() {
   const [items, setItems] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [form, setForm] = useState({});
@@ -13,9 +16,15 @@ export default function Applications() {
   const [products, setProducts] = useState([]);
   const navigate = useNavigate();
 
-  const load = () => {
-    api.get('/applications').then(r => setItems(r.data));
-    api.get('/borrowers').then(r => setBorrowers(r.data));
+  const load = (p = 1) => {
+    api.get(`/applications?page=${p}&limit=25`).then(r => {
+      const d = r.data;
+      setItems(d.data || d);
+      setTotal(d.total || (d.data || d).length);
+      setTotalPages(d.totalPages || 1);
+      setPage(p);
+    });
+    api.get('/borrowers?limit=100').then(r => setBorrowers(r.data.data || r.data));
     api.get('/properties').then(r => setProperties(r.data));
     api.get('/loan-products').then(r => setProducts(r.data));
   };
@@ -27,10 +36,10 @@ export default function Applications() {
   const save = async () => {
     if (editItem) await api.put(`/applications/${editItem.id}`, form);
     else await api.post('/applications', form);
-    setShowModal(false); load();
+    setShowModal(false); load(page);
   };
 
-  const remove = async (id, e) => { e.stopPropagation(); if (confirm('Delete this application?')) { await api.delete(`/applications/${id}`); load(); } };
+  const remove = async (id, e) => { e.stopPropagation(); if (confirm('Delete this application?')) { await api.delete(`/applications/${id}`); load(page); } };
 
   const fmt = (v) => v ? `$${Number(v).toLocaleString()}` : '-';
 
@@ -39,7 +48,7 @@ export default function Applications() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Loan Applications</h1>
-          <p className="text-gray-500 text-sm">{items.length} applications</p>
+          <p className="text-gray-500 text-sm">{total} applications</p>
         </div>
         <button onClick={openNew} className="btn-primary">+ New Application</button>
       </div>
@@ -78,6 +87,15 @@ export default function Applications() {
             ))}
           </tbody>
         </table>
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50">
+            <span className="text-sm text-gray-500">Page {page} of {totalPages} &mdash; {total} total</span>
+            <div className="flex gap-2">
+              <button onClick={() => load(page - 1)} disabled={page <= 1} className="px-3 py-1 rounded border text-sm disabled:opacity-40 hover:bg-white">Prev</button>
+              <button onClick={() => load(page + 1)} disabled={page >= totalPages} className="px-3 py-1 rounded border text-sm disabled:opacity-40 hover:bg-white">Next</button>
+            </div>
+          </div>
+        )}
       </div>
 
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editItem ? 'Edit Application' : 'New Application'}>
@@ -100,47 +118,27 @@ export default function Applications() {
               {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </FormField>
-          <FormField label="Loan Amount">
-            <input className="input-field" type="number" value={form.loan_amount || ''} onChange={e => setForm({...form, loan_amount: e.target.value})} />
-          </FormField>
-          <FormField label="Down Payment">
-            <input className="input-field" type="number" value={form.down_payment || ''} onChange={e => setForm({...form, down_payment: e.target.value})} />
-          </FormField>
-          <FormField label="Interest Rate %">
-            <input className="input-field" type="number" step="0.001" value={form.interest_rate || ''} onChange={e => setForm({...form, interest_rate: e.target.value})} />
-          </FormField>
-          <FormField label="LTV %">
-            <input className="input-field" type="number" value={form.ltv_ratio || ''} onChange={e => setForm({...form, ltv_ratio: e.target.value})} />
-          </FormField>
-          <FormField label="DTI %">
-            <input className="input-field" type="number" value={form.dti_ratio || ''} onChange={e => setForm({...form, dti_ratio: e.target.value})} />
-          </FormField>
+          <FormField label="Loan Amount"><input className="input-field" type="number" value={form.loan_amount || ''} onChange={e => setForm({...form, loan_amount: e.target.value})} /></FormField>
+          <FormField label="Down Payment"><input className="input-field" type="number" value={form.down_payment || ''} onChange={e => setForm({...form, down_payment: e.target.value})} /></FormField>
+          <FormField label="Interest Rate %"><input className="input-field" type="number" step="0.001" value={form.interest_rate || ''} onChange={e => setForm({...form, interest_rate: e.target.value})} /></FormField>
+          <FormField label="LTV %"><input className="input-field" type="number" value={form.ltv_ratio || ''} onChange={e => setForm({...form, ltv_ratio: e.target.value})} /></FormField>
+          <FormField label="DTI %"><input className="input-field" type="number" value={form.dti_ratio || ''} onChange={e => setForm({...form, dti_ratio: e.target.value})} /></FormField>
           <FormField label="Purpose">
             <select className="input-field" value={form.purpose || ''} onChange={e => setForm({...form, purpose: e.target.value})}>
-              <option value="purchase">Purchase</option>
-              <option value="refinance">Refinance</option>
-              <option value="cash_out">Cash-Out Refinance</option>
+              <option value="purchase">Purchase</option><option value="refinance">Refinance</option><option value="cash_out">Cash-Out Refinance</option>
             </select>
           </FormField>
           <FormField label="Status">
             <select className="input-field" value={form.status || ''} onChange={e => setForm({...form, status: e.target.value})}>
-              <option value="submitted">Submitted</option>
-              <option value="in_review">In Review</option>
-              <option value="conditional">Conditional</option>
-              <option value="approved">Approved</option>
-              <option value="denied">Denied</option>
+              <option value="submitted">Submitted</option><option value="in_review">In Review</option><option value="conditional">Conditional</option><option value="approved">Approved</option><option value="denied">Denied</option>
             </select>
           </FormField>
           <FormField label="Priority">
             <select className="input-field" value={form.priority || ''} onChange={e => setForm({...form, priority: e.target.value})}>
-              <option value="normal">Normal</option>
-              <option value="high">High</option>
-              <option value="urgent">Urgent</option>
+              <option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option>
             </select>
           </FormField>
-          <FormField label="Term (months)">
-            <input className="input-field" type="number" value={form.term_months || ''} onChange={e => setForm({...form, term_months: e.target.value})} />
-          </FormField>
+          <FormField label="Term (months)"><input className="input-field" type="number" value={form.term_months || ''} onChange={e => setForm({...form, term_months: e.target.value})} /></FormField>
         </div>
         <div className="flex gap-3 mt-6">
           <button onClick={save} className="btn-primary">Save</button>
