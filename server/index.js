@@ -83,6 +83,7 @@ app.use('/api/rules', authenticateToken, ruleRoutes);
 app.use('/api/pipeline', authenticateToken, pipelineRoutes);
 app.use('/api/ai', authenticateToken, aiRateLimiter, aiRoutes);
 app.use('/api/dashboard', authenticateToken, dashboardRoutes);
+app.use('/api/compensating-factor-matrix', authenticateToken, require('./routes/compensatingFactorMatrix'));
 
 // Health check
 app.get('/api/health', (req, res) => {

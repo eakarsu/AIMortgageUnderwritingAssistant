@@ -24,6 +24,29 @@ import Users from './pages/Users';
 import UnderwritingRules from './pages/UnderwritingRules';
 import Pipeline from './pages/Pipeline';
 import AICenter from './pages/AICenter';
+import CompensatingFactorMatrix from './pages/CompensatingFactorMatrix';
+
+import CodexCustomVizFeature from './pages/CodexCustomVizFeature';
+import CodexOperationsFeature from './pages/CodexOperationsFeature';
+
+import TimelineView from './pages/TimelineView';
+
+// Gap feature pages
+import GapAppraisal from './pages/GapAppraisal';
+import GapAssetVerification from './pages/GapAssetVerification';
+import GapBorrower from './pages/GapBorrower';
+import GapClosingReadiness from './pages/GapClosingReadiness';
+import GapEmploymentVerification from './pages/GapEmploymentVerification';
+import GapESignature from './pages/GapESignature';
+import GapPricing from './pages/GapPricing';
+import GapThirdParty from './pages/GapThirdParty';
+import GapTitle from './pages/GapTitle';
+import GapTitleRiskAssessment from './pages/GapTitleRiskAssessment';
+import GapWebhooks from './pages/GapWebhooks';
+import GapAgentic from './pages/GapAgentic';
+import GapAutonomous from './pages/GapAutonomous';
+import GapRealTime from './pages/GapRealTime';
+import GapVisionBased from './pages/GapVisionBased';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -54,6 +77,10 @@ function App() {
     <Router>
       <Layout user={user} onLogout={handleLogout}>
         <Routes>
+        <Route path="/insights/timeline" element={<TimelineView />} />
+        <Route path="/codex/custom-viz" element={<CodexCustomVizFeature />} />
+        <Route path="/codex/operations" element={<CodexOperationsFeature />} />
+
           <Route path="/" element={<Dashboard />} />
           <Route path="/applications" element={<Applications />} />
           <Route path="/applications/:id" element={<ApplicationDetail />} />
@@ -76,6 +103,25 @@ function App() {
           <Route path="/rules" element={<UnderwritingRules />} />
           <Route path="/pipeline" element={<Pipeline />} />
           <Route path="/ai" element={<AICenter />} />
+          <Route path="/compensating-factor-matrix" element={<CompensatingFactorMatrix />} />
+
+          {/* Gap feature routes */}
+          <Route path="/gap/appraisal" element={<GapAppraisal />} />
+          <Route path="/gap/asset-verification" element={<GapAssetVerification />} />
+          <Route path="/gap/borrower" element={<GapBorrower />} />
+          <Route path="/gap/closing-readiness" element={<GapClosingReadiness />} />
+          <Route path="/gap/employment-verification" element={<GapEmploymentVerification />} />
+          <Route path="/gap/e-signature" element={<GapESignature />} />
+          <Route path="/gap/pricing" element={<GapPricing />} />
+          <Route path="/gap/third-party" element={<GapThirdParty />} />
+          <Route path="/gap/title" element={<GapTitle />} />
+          <Route path="/gap/title-risk-assessment" element={<GapTitleRiskAssessment />} />
+          <Route path="/gap/webhooks" element={<GapWebhooks />} />
+          <Route path="/gap/agentic" element={<GapAgentic />} />
+          <Route path="/gap/autonomous" element={<GapAutonomous />} />
+          <Route path="/gap/realtime" element={<GapRealTime />} />
+          <Route path="/gap/vision" element={<GapVisionBased />} />
+
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Layout>

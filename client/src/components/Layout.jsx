@@ -22,9 +22,28 @@ const menuItems = [
   { path: '/users', label: 'Users', icon: '👥' },
 ];
 
+const gapMenuItems = [
+  { path: '/gap/appraisal', label: 'Appraisal', icon: '🏡' },
+  { path: '/gap/asset-verification', label: 'Asset Verification', icon: '🏦' },
+  { path: '/gap/borrower', label: 'Borrower Portal', icon: '🙋' },
+  { path: '/gap/closing-readiness', label: 'Closing Readiness', icon: '🔒' },
+  { path: '/gap/employment-verification', label: 'Employment Verify', icon: '💼' },
+  { path: '/gap/e-signature', label: 'E-Signature', icon: '✍️' },
+  { path: '/gap/pricing', label: 'Pricing Engine', icon: '💲' },
+  { path: '/gap/third-party', label: 'Third-Party Hub', icon: '🔗' },
+  { path: '/gap/title', label: 'Title Integration', icon: '📜' },
+  { path: '/gap/title-risk-assessment', label: 'Title Risk', icon: '⚡' },
+  { path: '/gap/webhooks', label: 'Webhooks (LOS)', icon: '🔔' },
+  { path: '/gap/agentic', label: 'Agentic UW', icon: '🤖' },
+  { path: '/gap/autonomous', label: 'Autonomous Pipeline', icon: '⚙️' },
+  { path: '/gap/realtime', label: 'Realtime Fraud', icon: '🚨' },
+  { path: '/gap/vision', label: 'Vision Doc Intel', icon: '👁️' },
+];
+
 export default function Layout({ children, user, onLogout }) {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [gapExpanded, setGapExpanded] = useState(false);
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -70,6 +89,34 @@ export default function Layout({ children, user, onLogout }) {
             <span className="text-lg">🤖</span>
             {sidebarOpen && <span className="ml-3 font-semibold">AI Center</span>}
           </Link>
+
+          {/* Gap AI Features section */}
+          <button
+            onClick={() => setGapExpanded(!gapExpanded)}
+            className="flex items-center w-full px-4 py-2.5 text-sm text-emerald-300 hover:bg-slate-800 hover:text-white transition-colors"
+          >
+            <span className="text-lg">🧩</span>
+            {sidebarOpen && (
+              <>
+                <span className="ml-3 font-semibold flex-1 text-left">Gap AI Features</span>
+                <span className="text-xs">{gapExpanded ? '▲' : '▼'}</span>
+              </>
+            )}
+          </button>
+          {gapExpanded && gapMenuItems.map((item) => (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={`flex items-center px-6 py-2 text-xs transition-colors ${
+                location.pathname === item.path
+                  ? 'bg-emerald-700 text-white'
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <span className="text-base">{item.icon}</span>
+              {sidebarOpen && <span className="ml-3">{item.label}</span>}
+            </Link>
+          ))}
         </nav>
 
         <div className="p-4 border-t border-slate-700">
