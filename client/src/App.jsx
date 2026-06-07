@@ -25,6 +25,8 @@ import UnderwritingRules from './pages/UnderwritingRules';
 import Pipeline from './pages/Pipeline';
 import AICenter from './pages/AICenter';
 import CompensatingFactorMatrix from './pages/CompensatingFactorMatrix';
+import MissingFeaturesHub from './pages/MissingFeaturesHub';
+import ProductionReadiness from './pages/ProductionReadiness';
 
 import CodexCustomVizFeature from './pages/CodexCustomVizFeature';
 import CodexOperationsFeature from './pages/CodexOperationsFeature';
@@ -121,8 +123,9 @@ function App() {
           <Route path="/gap/autonomous" element={<GapAutonomous />} />
           <Route path="/gap/realtime" element={<GapRealTime />} />
           <Route path="/gap/vision" element={<GapVisionBased />} />
-
-          <Route path="*" element={<Navigate to="/" />} />
+        <Route path="/missing-features" element={<MissingFeaturesHub />} />
+        <Route path="/production-readiness" element={<ProductionReadiness />} />
+        <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Layout>
     </Router>
