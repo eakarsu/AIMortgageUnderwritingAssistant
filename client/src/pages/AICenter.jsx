@@ -190,12 +190,20 @@ export default function AICenter() {
   const [borrowers, setBorrowers] = useState([]);
   const [properties, setProperties] = useState([]);
   const [applications, setApplications] = useState([]);
+  const [loanProducts, setLoanProducts] = useState([]);
   const [activeCategory, setActiveCategory] = useState(null);
 
+  const asRows = (payload) => {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.data)) return payload.data;
+    return [];
+  };
+
   useEffect(() => {
-    api.get('/borrowers').then(r => setBorrowers(r.data));
-    api.get('/properties').then(r => setProperties(r.data));
-    api.get('/applications').then(r => setApplications(r.data));
+    api.get('/borrowers?limit=100').then(r => setBorrowers(asRows(r.data))).catch(() => setBorrowers([]));
+    api.get('/properties').then(r => setProperties(asRows(r.data))).catch(() => setProperties([]));
+    api.get('/applications?limit=100').then(r => setApplications(asRows(r.data))).catch(() => setApplications([]));
+    api.get('/loan-products').then(r => setLoanProducts(asRows(r.data))).catch(() => setLoanProducts([]));
   }, []);
 
   useEffect(() => {
@@ -218,8 +226,44 @@ export default function AICenter() {
     setLoading(false);
   };
 
+  const findById = (rows, id) => rows.find((row) => Number(row.id) === Number(id));
+
+  const enrichForm = (values) => {
+    const next = { ...values };
+    const app = next.application_id ? findById(applications, next.application_id) : null;
+    const property = next.property_id ? findById(properties, next.property_id) : null;
+    const appProperty = app?.property_id ? findById(properties, app.property_id) : null;
+    const product = app?.loan_product_id ? findById(loanProducts, app.loan_product_id) : null;
+
+    if (app) {
+      next.application_id = Number(app.id);
+      next.borrower_id = next.borrower_id ? Number(next.borrower_id) : Number(app.borrower_id);
+      next.property_id = next.property_id ? Number(next.property_id) : Number(app.property_id);
+      next.loan_amount = next.loan_amount || app.loan_amount;
+      next.property_state = next.property_state || app.property_state || appProperty?.state || '';
+      next.loan_type = next.loan_type || product?.type || '';
+    }
+
+    const selectedProperty = property || appProperty;
+    if (selectedProperty) {
+      next.property_id = Number(selectedProperty.id);
+      next.property_state = next.property_state || selectedProperty.state || '';
+    }
+
+    if (next.borrower_id) next.borrower_id = Number(next.borrower_id);
+    if (next.application_id) next.application_id = Number(next.application_id);
+    if (next.property_id) next.property_id = Number(next.property_id);
+
+    return next;
+  };
+
+  const updateForm = (changes) => {
+    setForm((current) => enrichForm({ ...current, ...changes }));
+    setAiResult(null);
+  };
+
   const loadSample = (preset) => {
-    setForm(preset.data);
+    setForm(enrichForm(preset.data));
     setAiResult(null);
   };
 
@@ -305,40 +349,40 @@ export default function AICenter() {
           {/* All Dropdowns - always show all available data selectors */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-5">
             <FormField label="Borrower">
-              <select className="input-field" value={form.borrower_id||''} onChange={e => setForm({...form, borrower_id: e.target.value ? parseInt(e.target.value) : undefined})}>
+              <select className="input-field" value={form.borrower_id ? String(form.borrower_id) : ''} onChange={e => updateForm({ borrower_id: e.target.value ? parseInt(e.target.value) : undefined })}>
                 <option value="">Select Borrower...</option>
                 {borrowers.map(b => (
-                  <option key={b.id} value={b.id}>
+                  <option key={b.id} value={String(b.id)}>
                     {b.first_name} {b.last_name} — Score: {b.credit_score}, ${Number(b.annual_income).toLocaleString()}/yr
                   </option>
                 ))}
               </select>
             </FormField>
             <FormField label="Property">
-              <select className="input-field" value={form.property_id||''} onChange={e => setForm({...form, property_id: e.target.value ? parseInt(e.target.value) : undefined})}>
+              <select className="input-field" value={form.property_id ? String(form.property_id) : ''} onChange={e => updateForm({ property_id: e.target.value ? parseInt(e.target.value) : undefined })}>
                 <option value="">Select Property...</option>
                 {properties.map(p => (
-                  <option key={p.id} value={p.id}>
+                  <option key={p.id} value={String(p.id)}>
                     {p.address}, {p.city} {p.state} — ${Number(p.estimated_value).toLocaleString()}
                   </option>
                 ))}
               </select>
             </FormField>
             <FormField label="Application">
-              <select className="input-field" value={form.application_id||''} onChange={e => setForm({...form, application_id: e.target.value ? parseInt(e.target.value) : undefined})}>
+              <select className="input-field" value={form.application_id ? String(form.application_id) : ''} onChange={e => updateForm({ application_id: e.target.value ? parseInt(e.target.value) : undefined })}>
                 <option value="">Select Application...</option>
                 {applications.map(a => (
-                  <option key={a.id} value={a.id}>
+                  <option key={a.id} value={String(a.id)}>
                     {a.application_number} — {a.borrower_name} — ${Number(a.loan_amount).toLocaleString()} ({a.status})
                   </option>
                 ))}
               </select>
             </FormField>
             <FormField label="Loan Amount ($)">
-              <input className="input-field" type="number" placeholder="e.g. 500000" value={form.loan_amount||''} onChange={e => setForm({...form, loan_amount: e.target.value})} />
+              <input className="input-field" type="number" placeholder="e.g. 500000" value={form.loan_amount||''} onChange={e => updateForm({ loan_amount: e.target.value })} />
             </FormField>
             <FormField label="Loan Type">
-              <select className="input-field" value={form.loan_type||''} onChange={e => setForm({...form, loan_type: e.target.value})}>
+              <select className="input-field" value={form.loan_type||''} onChange={e => updateForm({ loan_type: e.target.value })}>
                 <option value="">Select Type...</option>
                 <option value="conventional">Conventional</option>
                 <option value="fha">FHA</option>
@@ -349,7 +393,7 @@ export default function AICenter() {
               </select>
             </FormField>
             <FormField label="Property State">
-              <select className="input-field" value={form.property_state||''} onChange={e => setForm({...form, property_state: e.target.value})}>
+              <select className="input-field" value={form.property_state||''} onChange={e => updateForm({ property_state: e.target.value })}>
                 <option value="">Select State...</option>
                 {['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC'].map(s => <option key={s} value={s}>{s}</option>)}
               </select>

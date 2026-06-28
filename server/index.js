@@ -28,6 +28,7 @@ const ruleRoutes = require('./routes/rules');
 const pipelineRoutes = require('./routes/pipeline');
 const aiRoutes = require('./routes/ai');
 const dashboardRoutes = require('./routes/dashboard');
+const operationsRoutes = require('./routes/operations');
 
 const app = express();
 const PORT = process.env.BACKEND_PORT || 3001;
@@ -83,6 +84,7 @@ app.use('/api/rules', authenticateToken, ruleRoutes);
 app.use('/api/pipeline', authenticateToken, pipelineRoutes);
 app.use('/api/ai', authenticateToken, aiRateLimiter, aiRoutes);
 app.use('/api/dashboard', authenticateToken, dashboardRoutes);
+app.use('/api/operations', authenticateToken, operationsRoutes);
 app.use('/api/compensating-factor-matrix', authenticateToken, require('./routes/compensatingFactorMatrix'));
 
 // Health check

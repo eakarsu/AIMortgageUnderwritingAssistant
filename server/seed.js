@@ -490,6 +490,74 @@ async function seed() {
     }
     console.log('Pipeline stages seeded');
 
+    // Seed Mortgage Operations Expansion (15 records per module)
+    const operationModules = [
+      ['disclosure-packages', 'Disclosure Package', ['loan estimate generated', 'closing disclosure review', 'redisclosure required', 'e-consent pending']],
+      ['los-integrations', 'LOS Integration', ['Encompass sync', 'Calyx import', 'Byte export', 'LOS webhook retry']],
+      ['credit-bureau-pulls', 'Credit Bureau Pull', ['tri-merge refresh', 'soft pull consent', 'supplement request', 'score discrepancy']],
+      ['aus-findings', 'AUS Findings', ['DU findings import', 'LP feedback review', 'refer with caution', 'approve eligible']],
+      ['title-vendor-integrations', 'Title Vendor Order', ['title search ordered', 'lien clearance', 'endorsement review', 'settlement agent update']],
+      ['task-work-queue', 'Work Queue Task', ['SLA escalation', 'processor follow-up', 'underwriter review', 'borrower outreach']],
+      ['closing-funding', 'Closing Funding Item', ['wire scheduled', 'closing package review', 'funding authorization', 'post-closing suspense']],
+      ['post-close-qc', 'Post-Close QC Item', ['prefund QC', 'post-close audit', 'defect remediation', 'investor suspense']],
+      ['hmda-lar-export', 'HMDA/LAR Record', ['demographic data review', 'action taken validation', 'rate spread check', 'quarterly export']],
+      ['role-permissions', 'Permission Control', ['role access review', 'privilege exception', 'segregation of duties', 'manager approval']],
+      ['document-storage-viewer', 'Document Storage Item', ['indexed package', 'viewer redaction', 'retention hold', 'missing file pointer']],
+      ['error-monitoring', 'Error Monitoring Alert', ['API timeout', 'AI provider fallback', 'seed validation issue', 'frontend crash report']],
+    ];
+    const statuses = ['open', 'in_progress', 'pending', 'completed', 'blocked'];
+    const priorities = ['low', 'medium', 'high', 'urgent'];
+    for (const [moduleKey, label, activities] of operationModules) {
+      for (let i = 1; i <= 15; i++) {
+        const applicationId = ((i - 1) % 20) + 1;
+        const borrowerId = ((i - 1) % 20) + 1;
+        const propertyId = ((i - 1) % 20) + 1;
+        const ownerId = ((i - 1) % 14) + 1;
+        const activity = activities[(i - 1) % activities.length];
+        const status = statuses[(i + moduleKey.length) % statuses.length];
+        const priority = priorities[(i + moduleKey.length) % priorities.length];
+        const dueDate = `2024-04-${String(((i - 1) % 28) + 1).padStart(2, '0')}`;
+        const amount = moduleKey === 'closing-funding' || moduleKey === 'fee-estimate'
+          ? 125000 + (i * 17500)
+          : moduleKey === 'disclosure-packages'
+            ? 750 + (i * 125)
+            : null;
+        const title = `${label} ${String(i).padStart(2, '0')} - ${activity}`;
+        const metadata = {
+          workflow: activity,
+          service_level: priority === 'urgent' ? 'same_day' : priority === 'high' ? '48_hours' : 'standard',
+          evidence: `${moduleKey.toUpperCase()}-${String(i).padStart(4, '0')}`,
+          checklist: [
+            'Validate source data',
+            'Confirm responsible owner',
+            'Attach audit evidence',
+          ],
+        };
+
+        await client.query(
+          `INSERT INTO mortgage_operation_records
+            (module_key,title,status,priority,owner_id,application_id,borrower_id,property_id,due_date,system_ref,amount,notes,metadata)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb)`,
+          [
+            moduleKey,
+            title,
+            status,
+            priority,
+            ownerId,
+            applicationId,
+            borrowerId,
+            propertyId,
+            dueDate,
+            `${moduleKey.toUpperCase()}-${String(i).padStart(5, '0')}`,
+            amount,
+            `${label} record seeded for operational tracking, evidence review, ownership, and audit follow-up.`,
+            JSON.stringify(metadata),
+          ]
+        );
+      }
+      console.log(`${label} operations seeded`);
+    }
+
     console.log('\n✅ All seed data inserted successfully!');
   } catch (err) {
     console.error('Seed error:', err);

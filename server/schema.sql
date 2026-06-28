@@ -1,4 +1,5 @@
 -- Drop tables if exist
+DROP TABLE IF EXISTS mortgage_operation_records CASCADE;
 DROP TABLE IF EXISTS audit_logs CASCADE;
 DROP TABLE IF EXISTS notifications CASCADE;
 DROP TABLE IF EXISTS conditions CASCADE;
@@ -325,3 +326,25 @@ CREATE TABLE pipeline_stages (
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMP DEFAULT NOW()
 );
+
+-- Mortgage Operations Expansion
+CREATE TABLE mortgage_operation_records (
+  id SERIAL PRIMARY KEY,
+  module_key VARCHAR(100) NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  status VARCHAR(50) DEFAULT 'open',
+  priority VARCHAR(20) DEFAULT 'medium',
+  owner_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  application_id INTEGER REFERENCES loan_applications(id) ON DELETE SET NULL,
+  borrower_id INTEGER REFERENCES borrowers(id) ON DELETE SET NULL,
+  property_id INTEGER REFERENCES properties(id) ON DELETE SET NULL,
+  due_date DATE,
+  system_ref VARCHAR(120),
+  amount DECIMAL(12,2),
+  notes TEXT,
+  metadata JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_mortgage_operation_records_module ON mortgage_operation_records(module_key);

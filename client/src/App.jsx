@@ -27,6 +27,7 @@ import AICenter from './pages/AICenter';
 import CompensatingFactorMatrix from './pages/CompensatingFactorMatrix';
 import MissingFeaturesHub from './pages/MissingFeaturesHub';
 import ProductionReadiness from './pages/ProductionReadiness';
+import MortgageOperationModule from './pages/MortgageOperationModule';
 
 import CodexCustomVizFeature from './pages/CodexCustomVizFeature';
 import CodexOperationsFeature from './pages/CodexOperationsFeature';
@@ -49,15 +50,34 @@ import GapAgentic from './pages/GapAgentic';
 import GapAutonomous from './pages/GapAutonomous';
 import GapRealTime from './pages/GapRealTime';
 import GapVisionBased from './pages/GapVisionBased';
+import api from './api';
 
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const token = localStorage.getItem('token');
     const stored = localStorage.getItem('user');
-    if (stored) setUser(JSON.parse(stored));
-    setLoading(false);
+
+    if (!token || !stored) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      setLoading(false);
+      return;
+    }
+
+    api.get('/auth/me')
+      .then((res) => {
+        setUser(res.data);
+        localStorage.setItem('user', JSON.stringify(res.data));
+      })
+      .catch(() => {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setUser(null);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const handleLogin = (userData) => {
@@ -125,6 +145,7 @@ function App() {
           <Route path="/gap/vision" element={<GapVisionBased />} />
         <Route path="/missing-features" element={<MissingFeaturesHub />} />
         <Route path="/production-readiness" element={<ProductionReadiness />} />
+        <Route path="/operations/:moduleKey" element={<MortgageOperationModule />} />
         <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Layout>

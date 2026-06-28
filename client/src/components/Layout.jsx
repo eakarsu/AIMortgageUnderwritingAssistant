@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { mortgageOperationModules } from '../mortgageOperations';
 
 const menuItems = [
   { path: '/', label: 'Dashboard', icon: '📊' },
@@ -44,6 +45,7 @@ export default function Layout({ children, user, onLogout }) {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [gapExpanded, setGapExpanded] = useState(false);
+  const [operationsExpanded, setOperationsExpanded] = useState(false);
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -89,6 +91,34 @@ export default function Layout({ children, user, onLogout }) {
             <span className="text-lg">🤖</span>
             {sidebarOpen && <span className="ml-3 font-semibold">AI Center</span>}
           </Link>
+
+          {/* Mortgage Operations section */}
+          <button
+            onClick={() => setOperationsExpanded(!operationsExpanded)}
+            className="flex items-center w-full px-4 py-2.5 text-sm text-blue-300 hover:bg-slate-800 hover:text-white transition-colors"
+          >
+            <span className="text-lg">🏗️</span>
+            {sidebarOpen && (
+              <>
+                <span className="ml-3 font-semibold flex-1 text-left">Mortgage Operations</span>
+                <span className="text-xs">{operationsExpanded ? '▲' : '▼'}</span>
+              </>
+            )}
+          </button>
+          {operationsExpanded && mortgageOperationModules.map((item) => (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={`flex items-center px-6 py-2 text-xs transition-colors ${
+                location.pathname === item.path
+                  ? 'bg-blue-700 text-white'
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <span className="text-base">{item.icon}</span>
+              {sidebarOpen && <span className="ml-3">{item.label}</span>}
+            </Link>
+          ))}
 
           {/* Gap AI Features section */}
           <button

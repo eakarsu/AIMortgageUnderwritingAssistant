@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import api from '../api';
+import React from 'react';
 
 export function StatusBadge({ status }) {
   const colors = {
@@ -40,8 +39,133 @@ export function AIResultDisplay({ result, loading }) {
   }
   if (!result) return null;
 
-  // Parse sections from the AI result
-  const sections = result.split(/(?=#{1,3}\s|\*\*[A-Z]|\d+[\.\)]\s(?=[A-Z]))/);
+  const formatLabel = (key) =>
+    String(key)
+      .replace(/_/g, ' ')
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+
+  const parseStructuredText = (value) => {
+    if (typeof value !== 'string') return value;
+    const trimmed = value.trim();
+    const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+    const candidate = fenced ? fenced[1].trim() : trimmed;
+    if (!candidate.startsWith('{') && !candidate.startsWith('[')) return value;
+    try {
+      return JSON.parse(candidate);
+    } catch {
+      return value;
+    }
+  };
+
+  const normalizedResult = parseStructuredText(result);
+
+  const renderScalar = (value) => {
+    if (value === null || value === undefined || value === '') return <span className="text-gray-400">Not provided</span>;
+    if (typeof value === 'boolean') return <StatusBadge status={value ? 'approved' : 'pending'} />;
+    if (typeof value === 'number') return <span>{Number.isInteger(value) ? value.toLocaleString() : value}</span>;
+    return <span>{String(value)}</span>;
+  };
+
+  const renderObject = (value, depth = 0) => {
+    const parsed = parseStructuredText(value);
+
+    if (Array.isArray(parsed)) {
+      if (parsed.length === 0) return <p className="text-gray-500 text-sm">No items returned.</p>;
+      if (parsed.every((item) => item === null || typeof item !== 'object')) {
+        return (
+          <ul className="space-y-2">
+            {parsed.map((item, index) => (
+              <li key={index} className="flex gap-2 text-gray-700">
+                <span className="mt-1 h-1.5 w-1.5 rounded-full bg-blue-500 flex-shrink-0"></span>
+                <span>{renderScalar(item)}</span>
+              </li>
+            ))}
+          </ul>
+        );
+      }
+      return (
+        <div className="space-y-3">
+          {parsed.map((item, index) => (
+            <div key={index} className="bg-white rounded-lg border border-blue-100 p-4 shadow-sm">
+              {renderObject(item, depth + 1)}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    if (parsed && typeof parsed === 'object') {
+      const entries = Object.entries(parsed);
+      if (entries.length === 0) return <p className="text-gray-500 text-sm">No details returned.</p>;
+      return (
+        <div className={depth === 0 ? 'space-y-5' : 'space-y-3'}>
+          {entries.map(([key, value]) => {
+            const complex = value && typeof value === 'object';
+            return (
+              <section key={key} className={complex ? 'space-y-2' : 'grid grid-cols-1 md:grid-cols-[220px_1fr] gap-2 border-b border-slate-100 pb-2 last:border-b-0'}>
+                <h4 className={complex ? 'text-sm font-bold uppercase tracking-wide text-blue-800' : 'text-sm font-medium text-gray-500'}>
+                  {formatLabel(key)}
+                </h4>
+                <div className="text-sm text-gray-800">
+                  {complex ? renderObject(value, depth + 1) : renderScalar(value)}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      );
+    }
+
+    const text = String(parsed);
+    return (
+      <div className="prose prose-sm max-w-none">
+        {text.split('\n').map((line, i) => {
+          if (!line.trim()) return <br key={i} />;
+          if (line.startsWith('###')) return <h4 key={i} className="text-lg font-bold text-gray-800 mt-4 mb-2 border-b pb-1">{line.replace(/^#+\s*/, '')}</h4>;
+          if (line.startsWith('##')) return <h3 key={i} className="text-xl font-bold text-blue-800 mt-5 mb-2">{line.replace(/^#+\s*/, '')}</h3>;
+          if (line.startsWith('#')) return <h2 key={i} className="text-2xl font-bold text-blue-900 mt-6 mb-3">{line.replace(/^#+\s*/, '')}</h2>;
+          if (line.match(/^\*\*.*\*\*$/)) return <p key={i} className="font-bold text-gray-800 mt-3 mb-1">{line.replace(/\*\*/g, '')}</p>;
+          if (line.startsWith('- ') || line.startsWith('* ')) {
+            const content = line.replace(/^[-*]\s*/, '');
+            const boldMatch = content.match(/^\*\*(.*?)\*\*:?\s*(.*)/);
+            if (boldMatch) {
+              return (
+                <div key={i} className="flex items-start gap-2 ml-4 my-1">
+                  <span className="text-blue-500 mt-1">•</span>
+                  <div><span className="font-semibold text-gray-800">{boldMatch[1]}: </span><span className="text-gray-600">{boldMatch[2]}</span></div>
+                </div>
+              );
+            }
+            return <div key={i} className="flex items-start gap-2 ml-4 my-1"><span className="text-blue-500 mt-1">•</span><span className="text-gray-700">{content}</span></div>;
+          }
+          if (line.match(/^\d+[\.\)]/)) {
+            const content = line.replace(/^\d+[\.\)]\s*/, '');
+            const boldMatch = content.match(/^\*\*(.*?)\*\*:?\s*(.*)/);
+            if (boldMatch) {
+              return (
+                <div key={i} className="bg-white rounded-lg p-3 my-2 border-l-4 border-blue-400 shadow-sm">
+                  <span className="font-semibold text-blue-800">{boldMatch[1]}</span>
+                  {boldMatch[2] && <p className="text-gray-600 mt-1">{boldMatch[2]}</p>}
+                </div>
+              );
+            }
+            return <div key={i} className="bg-white rounded-lg p-3 my-2 border-l-4 border-gray-300 shadow-sm text-gray-700">{content}</div>;
+          }
+          const parts = line.split(/(\*\*.*?\*\*)/);
+          return (
+            <p key={i} className="text-gray-700 my-1">
+              {parts.map((part, j) =>
+                part.startsWith('**') && part.endsWith('**')
+                  ? <strong key={j} className="text-gray-900">{part.slice(2, -2)}</strong>
+                  : <span key={j}>{part}</span>
+              )}
+            </p>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <div className="bg-gradient-to-br from-slate-50 to-blue-50 rounded-xl border border-blue-100 overflow-hidden">
@@ -53,52 +177,7 @@ export function AIResultDisplay({ result, loading }) {
         </div>
       </div>
       <div className="p-6">
-        <div className="prose prose-sm max-w-none">
-          {result.split('\n').map((line, i) => {
-            if (!line.trim()) return <br key={i} />;
-            if (line.startsWith('###')) return <h4 key={i} className="text-lg font-bold text-gray-800 mt-4 mb-2 border-b pb-1">{line.replace(/^#+\s*/, '')}</h4>;
-            if (line.startsWith('##')) return <h3 key={i} className="text-xl font-bold text-blue-800 mt-5 mb-2">{line.replace(/^#+\s*/, '')}</h3>;
-            if (line.startsWith('#')) return <h2 key={i} className="text-2xl font-bold text-blue-900 mt-6 mb-3">{line.replace(/^#+\s*/, '')}</h2>;
-            if (line.match(/^\*\*.*\*\*$/)) return <p key={i} className="font-bold text-gray-800 mt-3 mb-1">{line.replace(/\*\*/g, '')}</p>;
-            if (line.startsWith('- ') || line.startsWith('* ')) {
-              const content = line.replace(/^[-*]\s*/, '');
-              const boldMatch = content.match(/^\*\*(.*?)\*\*:?\s*(.*)/);
-              if (boldMatch) {
-                return (
-                  <div key={i} className="flex items-start gap-2 ml-4 my-1">
-                    <span className="text-blue-500 mt-1">•</span>
-                    <div><span className="font-semibold text-gray-800">{boldMatch[1]}: </span><span className="text-gray-600">{boldMatch[2]}</span></div>
-                  </div>
-                );
-              }
-              return <div key={i} className="flex items-start gap-2 ml-4 my-1"><span className="text-blue-500 mt-1">•</span><span className="text-gray-700">{content}</span></div>;
-            }
-            if (line.match(/^\d+[\.\)]/)) {
-              const content = line.replace(/^\d+[\.\)]\s*/, '');
-              const boldMatch = content.match(/^\*\*(.*?)\*\*:?\s*(.*)/);
-              if (boldMatch) {
-                return (
-                  <div key={i} className="bg-white rounded-lg p-3 my-2 border-l-4 border-blue-400 shadow-sm">
-                    <span className="font-semibold text-blue-800">{boldMatch[1]}</span>
-                    {boldMatch[2] && <p className="text-gray-600 mt-1">{boldMatch[2]}</p>}
-                  </div>
-                );
-              }
-              return <div key={i} className="bg-white rounded-lg p-3 my-2 border-l-4 border-gray-300 shadow-sm text-gray-700">{content}</div>;
-            }
-            // Inline bold
-            const parts = line.split(/(\*\*.*?\*\*)/);
-            return (
-              <p key={i} className="text-gray-700 my-1">
-                {parts.map((part, j) =>
-                  part.startsWith('**') && part.endsWith('**')
-                    ? <strong key={j} className="text-gray-900">{part.slice(2, -2)}</strong>
-                    : <span key={j}>{part}</span>
-                )}
-              </p>
-            );
-          })}
-        </div>
+        {renderObject(normalizedResult)}
       </div>
     </div>
   );
