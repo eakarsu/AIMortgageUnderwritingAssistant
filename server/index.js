@@ -34,7 +34,7 @@ const app = express();
 const PORT = process.env.BACKEND_PORT || 3001;
 
 app.use(helmet());
-app.use(cors());
+app.use(cors({origin:process.env.CLIENT_URL||'http://localhost:3000',credentials:true}));
 app.use(express.json());
 app.use(generalLimiter);
 
@@ -86,6 +86,12 @@ app.use('/api/ai', authenticateToken, aiRateLimiter, aiRoutes);
 app.use('/api/dashboard', authenticateToken, dashboardRoutes);
 app.use('/api/operations', authenticateToken, operationsRoutes);
 app.use('/api/compensating-factor-matrix', authenticateToken, require('./routes/compensatingFactorMatrix'));
+app.use('/api/mortgage-workflow', authenticateToken, require('./routes/mortgageWorkflow'));
+
+app.use(/^\/api\/(?:gap-|underwriting-orchestrator|vision-document-intel|pipeline-bottleneck-agent|realtime-fraud-stream|borrower-engagement)/, (req,res,next) => {
+  if (process.env.ENABLE_EXPERIMENTAL_ROUTES === 'true') return next();
+  return res.status(501).json({error:'Generated/provider-backed surface is quarantined',required:'ENABLE_EXPERIMENTAL_ROUTES=true plus documented provider configuration'});
+});
 
 // Health check
 app.get('/api/health', (req, res) => {
