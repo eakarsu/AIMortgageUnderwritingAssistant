@@ -3,10 +3,11 @@ const fetch = require('node-fetch');
 const pool = require('../db');
 const router = express.Router();
 
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const OPENROUTER_URL = `${(process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1').replace(/\/$/, '')}/chat/completions`;
 const MODEL = process.env.OPENROUTER_MODEL || 'anthropic/claude-3-5-sonnet-20241022';
 
 async function callAI(prompt, systemPrompt) {
+  if (!process.env.OPENROUTER_API_KEY) throw new Error('OPENROUTER_API_KEY is required');
   const response = await fetch(OPENROUTER_URL, {
     method: 'POST',
     headers: {
@@ -25,6 +26,7 @@ async function callAI(prompt, systemPrompt) {
       max_tokens: 2000,
     }),
   });
+  if (!response.ok) throw new Error(`OpenRouter API error: ${response.status}`);
   const data = await response.json();
   if (data.error) throw new Error(data.error.message || 'AI API error');
   return data.choices[0].message.content;

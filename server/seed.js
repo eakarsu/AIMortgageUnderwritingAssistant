@@ -4,6 +4,13 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
+if (process.env.ALLOW_DEMO_SEED !== 'true' || process.env.NODE_ENV === 'production') {
+  throw new Error('Demo seed is quarantined; set ALLOW_DEMO_SEED=true outside production');
+}
+if (!process.env.DEMO_SEED_PASSWORD || process.env.DEMO_SEED_PASSWORD.length < 12) {
+  throw new Error('DEMO_SEED_PASSWORD must contain at least 12 characters');
+}
+
 const pool = new Pool({
   host: process.env.DB_HOST || 'localhost',
   port: process.env.DB_PORT || 5432,
@@ -21,9 +28,9 @@ async function seed() {
     console.log('Schema created successfully');
 
     // Seed Users (15)
-    const hashedPassword = await bcrypt.hash('password123', 10);
+    const hashedPassword = await bcrypt.hash(process.env.DEMO_SEED_PASSWORD, 10);
     const users = [
-      ['admin@mortgage.com', hashedPassword, 'Sarah Johnson', 'admin'],
+      [process.env.DEMO_EMAIL || 'runtime-admin@example.com', hashedPassword, 'Runtime Admin', 'admin'],
       ['underwriter1@mortgage.com', hashedPassword, 'Michael Chen', 'underwriter'],
       ['underwriter2@mortgage.com', hashedPassword, 'Emily Rodriguez', 'underwriter'],
       ['underwriter3@mortgage.com', hashedPassword, 'David Kim', 'underwriter'],
