@@ -93,6 +93,8 @@ app.use(/^\/api\/(?:gap-|underwriting-orchestrator|vision-document-intel|pipelin
   return res.status(501).json({error:'Generated/provider-backed surface is quarantined',required:'ENABLE_EXPERIMENTAL_ROUTES=true plus documented provider configuration'});
 });
 
+app.use('/api', require('./routes/generatedFeatures').router);
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

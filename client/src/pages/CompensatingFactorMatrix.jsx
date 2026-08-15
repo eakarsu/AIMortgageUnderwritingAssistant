@@ -1,3 +1,4 @@
+import GeneratedAiResponse from './GeneratedAiResponse';
 import React, { useState } from 'react';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
@@ -23,7 +24,7 @@ export default function CompensatingFactorMatrix() {
       {result && (
         <div className="mt-6 bg-white rounded shadow p-4">
           <h2 className="font-semibold">{result.netScore}/100 - {result.decisionSupport}</h2>
-          <pre className="mt-3 text-sm">{JSON.stringify(result, null, 2)}</pre>
+          <GeneratedAiResponse response={result} />
         </div>
       )}
     </div>
