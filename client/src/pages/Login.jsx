@@ -76,10 +76,11 @@ export default function Login({ onLogin }) {
 
           <div className="mt-4 pt-4 border-t">
             <button
+              type="button"
               onClick={autoFill}
               className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-4 py-3 rounded-lg hover:from-emerald-600 hover:to-teal-600 transition-all font-medium shadow-md"
             >
-              🔑 Quick Login (Demo Account)
+              Auto Fill Demo Credentials
             </button>
             <p className="text-xs text-gray-400 mt-2 text-center">Fills in demo credentials automatically</p>
           </div>
