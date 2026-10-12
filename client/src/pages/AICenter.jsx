@@ -1,3 +1,4 @@
+import NativeAIControls from "../components/NativeAIControls.jsx";
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../api';
@@ -34,6 +35,39 @@ const aiTools = [
 ];
 
 const categories = ['Borrower Analysis', 'Property & Valuation', 'Application Review', 'Operations & Intelligence'];
+const supportedLoanTypes = new Set(['conventional', 'fha', 'va', 'usda', 'jumbo', 'arm']);
+
+const rowById = (rows, id) => rows.find((row) => Number(row.id) === Number(id));
+
+export function completePresetData(seed = {}, records = {}, fallbackIndex = 0) {
+  const borrowers = records.borrowers || [];
+  const properties = records.properties || [];
+  const applications = records.applications || [];
+  const loanProducts = records.loanProducts || [];
+  const index = Math.max(0, fallbackIndex) % Math.max(applications.length, borrowers.length, properties.length, 1);
+
+  const requestedApplication = seed.application_id ? rowById(applications, seed.application_id) : null;
+  const matchingApplications = applications.filter((application) =>
+    (!seed.borrower_id || Number(application.borrower_id) === Number(seed.borrower_id)) &&
+    (!seed.property_id || Number(application.property_id) === Number(seed.property_id))
+  );
+  const application = requestedApplication || matchingApplications[index % Math.max(matchingApplications.length, 1)] || applications[index % Math.max(applications.length, 1)];
+  const requestedBorrower = seed.borrower_id ? rowById(borrowers, seed.borrower_id) : null;
+  const requestedProperty = seed.property_id ? rowById(properties, seed.property_id) : null;
+  const borrower = requestedBorrower || rowById(borrowers, application?.borrower_id) || borrowers[index % Math.max(borrowers.length, 1)];
+  const property = requestedProperty || rowById(properties, application?.property_id) || properties[index % Math.max(properties.length, 1)];
+  const product = rowById(loanProducts, application?.loan_product_id);
+  const productType = String(seed.loan_type || product?.type || '').toLowerCase();
+
+  return {
+    borrower_id: borrower ? Number(borrower.id) : undefined,
+    property_id: property ? Number(property.id) : undefined,
+    application_id: application ? Number(application.id) : undefined,
+    loan_amount: Number(seed.loan_amount || application?.loan_amount || property?.listing_price || property?.estimated_value || 400000),
+    loan_type: supportedLoanTypes.has(productType) ? productType : 'conventional',
+    property_state: seed.property_state || property?.state || application?.property_state || 'CA',
+  };
+}
 
 // Sample presets - each tool gets multiple quick-load combos
 const samplePresets = {
@@ -226,7 +260,7 @@ export default function AICenter() {
     setLoading(false);
   };
 
-  const findById = (rows, id) => rows.find((row) => Number(row.id) === Number(id));
+  const findById = (rows, id) => rowById(rows, id);
 
   const enrichForm = (values) => {
     const next = { ...values };
@@ -262,16 +296,30 @@ export default function AICenter() {
     setAiResult(null);
   };
 
-  const loadSample = (preset) => {
-    setForm(enrichForm(preset.data));
+  const records = { borrowers, properties, applications, loanProducts };
+  const referenceDataReady = borrowers.length > 0 && properties.length > 0 && applications.length > 0;
+  const completeSample = (values, index) => completePresetData(values, records, index);
+
+  const loadSample = (preset, index) => {
+    setForm(completeSample(preset.data, index));
     setAiResult(null);
   };
 
   const filteredTools = activeCategory ? aiTools.filter(t => t.category === activeCategory) : aiTools;
   const presets = selectedTool ? (samplePresets[selectedTool.id] || []) : [];
+  const fullFieldPresets = ['Quick brief', 'Team planning', 'Detailed review'].map((name, index) => ({
+    name,
+    fill: () => {
+      if (!selectedTool || !referenceDataReady) return { filled: 0, manual: ['a selected AI tool and loaded mortgage records'] };
+      const source = presets[index % Math.max(presets.length, 1)]?.data || {};
+      setForm(completeSample(source, index));
+      setAiResult(null);
+      return { filled: 6, manual: [] };
+    },
+  }));
 
   return (
-    <div>
+    <NativeAIControls busy={loading} context="MortgageUnderwritingAssistant" presets={fullFieldPresets}><div>
       <div className="mb-6">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-blue-600 rounded-xl flex items-center justify-center">
@@ -336,8 +384,11 @@ export default function AICenter() {
                 {presets.map((preset, i) => (
                   <button
                     key={i}
-                    onClick={() => loadSample(preset)}
-                    className="px-3 py-1.5 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 text-indigo-700 rounded-lg text-xs font-medium hover:from-indigo-100 hover:to-purple-100 hover:border-indigo-300 transition-all"
+                    type="button"
+                    disabled={loading || !referenceDataReady}
+                    title={referenceDataReady ? 'Fill all six AI request fields with linked mortgage records' : 'Loading mortgage records…'}
+                    onClick={() => loadSample(preset, i)}
+                    className="px-3 py-1.5 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 text-indigo-700 rounded-lg text-xs font-medium hover:from-indigo-100 hover:to-purple-100 hover:border-indigo-300 transition-all disabled:cursor-wait disabled:opacity-50"
                   >
                     ⚡ {preset.label}
                   </button>
@@ -379,10 +430,10 @@ export default function AICenter() {
               </select>
             </FormField>
             <FormField label="Loan Amount ($)">
-              <input className="input-field" type="number" placeholder="e.g. 500000" value={form.loan_amount||''} onChange={e => updateForm({ loan_amount: e.target.value })} />
+              <input data-ai-field={"loan_amount"} className="input-field" type="number" placeholder="e.g. 500000" value={form.loan_amount||''} onChange={e => updateForm({ loan_amount: e.target.value })} />
             </FormField>
             <FormField label="Loan Type">
-              <select className="input-field" value={form.loan_type||''} onChange={e => updateForm({ loan_type: e.target.value })}>
+              <select data-ai-field={"loan_type"} className="input-field" value={form.loan_type||''} onChange={e => updateForm({ loan_type: e.target.value })}>
                 <option value="">Select Type...</option>
                 <option value="conventional">Conventional</option>
                 <option value="fha">FHA</option>
@@ -393,7 +444,7 @@ export default function AICenter() {
               </select>
             </FormField>
             <FormField label="Property State">
-              <select className="input-field" value={form.property_state||''} onChange={e => updateForm({ property_state: e.target.value })}>
+              <select data-ai-field={"property_state"} className="input-field" value={form.property_state||''} onChange={e => updateForm({ property_state: e.target.value })}>
                 <option value="">Select State...</option>
                 {['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC'].map(s => <option key={s} value={s}>{s}</option>)}
               </select>
@@ -424,6 +475,6 @@ export default function AICenter() {
       )}
 
       <AIResultDisplay result={aiResult} loading={loading} />
-    </div>
+    </div></NativeAIControls>
   );
 }

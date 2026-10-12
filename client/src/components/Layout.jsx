@@ -1,3 +1,4 @@
+import AIReportLibrary from "./AIReportLibrary";
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { mortgageOperationModules } from '../mortgageOperations';
@@ -160,7 +161,7 @@ export default function Layout({ children, user, onLogout }) {
             {sidebarOpen ? 'Sign Out' : '🚪'}
           </button>
         </div>
-      </aside>
+      <AIReportLibrary /></aside>
 
       {/* Main content */}
       <main className="flex-1 overflow-y-auto">

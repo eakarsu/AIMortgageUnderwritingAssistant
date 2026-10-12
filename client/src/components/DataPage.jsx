@@ -72,6 +72,29 @@ export function AIResultDisplay({ result, loading }) {
 
     if (Array.isArray(parsed)) {
       if (parsed.length === 0) return <p className="text-gray-500 text-sm">No items returned.</p>;
+      const tabular = parsed.length > 1 && parsed.every((item) =>
+        item && typeof item === 'object' && !Array.isArray(item) &&
+        Object.values(item).every((cell) => cell === null || ['string', 'number', 'boolean'].includes(typeof cell))
+      );
+      if (tabular) {
+        const columns = [...new Set(parsed.flatMap((item) => Object.keys(item)))];
+        return (
+          <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+            <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
+              <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-600">
+                <tr>{columns.map((column) => <th key={column} className="px-4 py-3 font-semibold">{formatLabel(column)}</th>)}</tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {parsed.map((item, index) => (
+                  <tr key={index} className="align-top even:bg-slate-50/60">
+                    {columns.map((column) => <td key={column} className="px-4 py-3 text-slate-700">{renderScalar(item[column])}</td>)}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      }
       if (parsed.every((item) => item === null || typeof item !== 'object')) {
         return (
           <ul className="space-y-2">

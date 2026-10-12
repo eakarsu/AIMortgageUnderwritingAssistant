@@ -1,18 +1,22 @@
+import { useRef as useDemoLoginRef, useState as useDemoLoginState } from 'react';
 import React, { useState } from 'react';
 import api from '../api';
 
 export default function Login({ onLogin }) {
+  const demoLoginLock = useDemoLoginRef(false);
+  const [demoLoginBusy, setDemoLoginBusy] = useDemoLoginState(false);
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e, demoLoginCredentials) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     try {
-      const { data } = await api.post('/auth/login', { email, password });
+      const { data } = await api.post('/auth/login', { email: (demoLoginCredentials?.email ?? email), password: (demoLoginCredentials?.password ?? password) });
       localStorage.setItem('token', data.token);
       onLogin(data.user);
     } catch (err) {
@@ -75,12 +79,25 @@ export default function Login({ onLogin }) {
           </form>
 
           <div className="mt-4 pt-4 border-t">
-            <button
+            <button disabled={demoLoginBusy}
               type="button"
-              onClick={autoFill}
+              onClick={async (event) => {
+ if (demoLoginLock.current) return;
+ demoLoginLock.current = true; setDemoLoginBusy(true);
+ const values = {};
+ const captureDemoValue = (key, value) => { values[key] = value; return value; };
+ try {
+  await (async () => {
+    setEmail(captureDemoValue("email", import.meta.env.VITE_DEMO_EMAIL || ''));
+    setPassword(captureDemoValue("password", import.meta.env.VITE_DEMO_PASSWORD || ''));
+  })(event);
+  if (values.error || typeof values.email !== 'string' || !values.email || typeof values.password !== 'string' || !values.password) { setError(typeof values.error === 'string' ? values.error : 'Demo credentials are unavailable.'); return; }
+  await handleSubmit(event, { email: values.email, password: values.password });
+ } finally { demoLoginLock.current = false; setDemoLoginBusy(false); }
+}}
               className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-4 py-3 rounded-lg hover:from-emerald-600 hover:to-teal-600 transition-all font-medium shadow-md"
             >
-              Auto Fill Demo Credentials
+              Log In as Demo
             </button>
             <p className="text-xs text-gray-400 mt-2 text-center">Fills in demo credentials automatically</p>
           </div>
